@@ -54,3 +54,13 @@ helm install local-llm local-llm/local-llm -f values.yaml
 ```bash
 ./scripts/lint.sh
 ```
+
+## Releasing
+
+Bump `charts/local-llm/Chart.yaml`'s `version` (plain `X.Y.Z` on `main`,
+`X.Y.Z-suffix` on `beta`) and push; `chart-releaser` publishes it to the GitHub
+Pages repo automatically. To actually roll the new version out to
+`rtx2000-ada-128gb-se` for testing, also bump `spec.version` in
+[gitops/rtx2000-ada-128gb-se.yaml](gitops/rtx2000-ada-128gb-se.yaml) to match, in
+the same commit — the device's helm-controller only re-applies the chart when
+that field changes.

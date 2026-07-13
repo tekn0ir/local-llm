@@ -57,4 +57,14 @@ decision trail.
 - `.github/workflows/release.yml` — push to `main` releases a stable chart
   version; `version` must match plain `X.Y.Z`.
 - Both are driven by `helm/chart-releaser-action` off the version field in
-  `charts/local-llm/Chart.yaml`.
+  `charts/local-llm/Chart.yaml`. CI does **not** touch
+  `gitops/rtx2000-ada-128gb-se.yaml` — that's a manual step (next).
+
+## Rolling a new version out to the device
+
+`gitops/rtx2000-ada-128gb-se.yaml`'s `spec.version` pins the chart version the
+device actually runs; the platform's helm-controller only re-applies the chart
+when that field changes. When bumping `charts/local-llm/Chart.yaml`'s
+`version` to cut a release or beta build meant to be tested on
+`rtx2000-ada-128gb-se`, also bump `spec.version` in
+`gitops/rtx2000-ada-128gb-se.yaml` to match, in the same commit.

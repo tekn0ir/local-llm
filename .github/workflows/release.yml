@@ -37,7 +37,6 @@ jobs:
           exit 1
           fi
           echo "Chart version $CHART_VERSION is valid for a stable release"
-          echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@a917fd15b20e8b64b94d9158ad54cd6345335584 # v1.6.0
@@ -45,18 +44,3 @@ jobs:
           skip_existing: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Pin rtx2000-ada-128gb-se device manifest to the released version
-        run: |
-          MANIFEST=gitops/rtx2000-ada-128gb-se.yaml
-          CHART_VERSION="${{ steps.check_chart_version.outputs.version }}"
-          if grep -q '^  version:' "$MANIFEST"; then
-            sed -i "s/^  version:.*/  version: $CHART_VERSION/" "$MANIFEST"
-          else
-            sed -i "/^  chart: local-llm/a\\  version: $CHART_VERSION" "$MANIFEST"
-          fi
-          if ! git diff --quiet -- "$MANIFEST"; then
-            git add "$MANIFEST"
-            git commit -m "Pin local-llm to $CHART_VERSION on rtx2000-ada-128gb-se"
-            git push
-          fi
