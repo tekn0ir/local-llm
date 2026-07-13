@@ -13,6 +13,6 @@ metadata:
 spec:
   repo: https://tekn0ir.github.io/local-llm
   chart: local-llm
-  version: 0.1.1
+  version: 0.2.0
   targetNamespace: default
   valuesContent: |-

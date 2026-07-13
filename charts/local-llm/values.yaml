@@ -44,3 +44,26 @@ resources:
   # register GPU as a schedulable device-plugin resource (confirmed on-device),
   # so setting it would leave the pod stuck Pending. GPU access is granted purely
   # via runtimeClassName: nvidia, matching the sibling openclaw-helm chart.
+
+# Open WebUI: a chat UI for testing/evaluating the model, talking to
+# llama-server's OpenAI-compatible API (see service.yaml). No GPU needed.
+# Exposed via NodePort per this platform's convention (ClusterIP stays
+# reserved for the model API itself).
+openWebui:
+  image:
+    repository: ghcr.io/open-webui/open-webui
+    # TODO: pin to a digest once a known-good version is verified for this hardware.
+    tag: main
+    pullPolicy: Always
+  # Fixed NodePort for the web UI, derived from its default UI port 8080.
+  nodePort: 30080
+  # Chat history, uploads, and the local vector DB.
+  persistence:
+    hostPath: /opt/teknoir/local-llm/open-webui
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi

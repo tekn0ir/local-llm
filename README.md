@@ -12,6 +12,11 @@ throughput. See [HARDWARE.md](HARDWARE.md) for the target device's specs and the
 full model/runtime decision trail (why DeepSeek-V4-Flash, colibrì+GLM-5.2, and vLLM
 were ruled out).
 
+The chart also deploys [Open WebUI](https://github.com/open-webui/open-webui) as a
+chat interface for testing/evaluating the model, wired to llama-server's
+OpenAI-compatible API. It's exposed via NodePort `30080` (the model API itself
+stays ClusterIP-only).
+
 > The implementation of the Helm chart is the bare minimum to get it to work by design.
 
 ## Usage in Teknoir platform

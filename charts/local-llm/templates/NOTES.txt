@@ -11,3 +11,9 @@ Example request once ready:
   curl http://local-llm.{{ .Release.Namespace }}.svc.cluster.local:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model": "{{ .Values.model.servedName }}", "messages": [{"role": "user", "content": "Hello"}]}'
+
+Open WebUI (chat interface for testing/evaluating the model) is available at:
+  http://<node-ip>:{{ .Values.openWebui.nodePort }}
+
+Get a node IP with:
+  kubectl get nodes -o wide

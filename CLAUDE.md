@@ -14,7 +14,9 @@ decision trail.
 ## Key files
 
 - `charts/local-llm/` — the Helm chart: `Chart.yaml`, `values.yaml`,
-  `templates/deployment.yaml`, `templates/service.yaml`, `templates/NOTES.txt`.
+  `templates/deployment.yaml`, `templates/service.yaml`, `templates/NOTES.txt`,
+  plus `templates/deployment-open-webui.yaml` /
+  `templates/service-open-webui.yaml` for the Open WebUI chat interface.
 - `HARDWARE.md` — canonical hardware specs (re-verify before trusting if
   stale) and the model/runtime decision trail.
 - `scripts/lint.sh` — helm lint + helm template smoke test.
