@@ -1,0 +1,17 @@
+# Rancher HelmChart manifest for the `rtx2000-ada-128gb-se` device.
+# Point the Teknoir platform's GitOps source at this file to deploy local-llm.
+# Chart defaults are already tuned for this device; leave valuesContent empty.
+# spec.version is pinned (not left floating) so bumping it forces the
+# helm-controller to roll the device to the new chart; the release workflow
+# keeps it in sync with charts/local-llm/Chart.yaml automatically.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: local-llm
+  namespace: default
+spec:
+  repo: https://tekn0ir.github.io/local-llm
+  chart: local-llm
+  version: 0.1.1
+  targetNamespace: default
+  valuesContent: |-

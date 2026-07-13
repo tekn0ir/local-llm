@@ -1,0 +1,60 @@
+# CLAUDE.md
+
+## Project overview
+
+Single-chart Helm GitOps repo that deploys a local LLM server to a K3s
+cluster on the Teknoir platform, targeting the device `rtx2000-ada-128gb-se`
+(2x NVIDIA RTX 2000 Ada, 32GB combined VRAM, 125GB RAM). The model backend is
+**Qwen3-235B-A22B-Instruct-2507** served via `llama-server` (llama.cpp), with
+MoE routed-expert tensors kept on CPU/RAM and everything else split across
+both GPUs. See [README.md](README.md) for usage/install and
+[HARDWARE.md](HARDWARE.md) for the device specs and full model/runtime
+decision trail.
+
+## Key files
+
+- `charts/local-llm/` — the Helm chart: `Chart.yaml`, `values.yaml`,
+  `templates/deployment.yaml`, `templates/service.yaml`, `templates/NOTES.txt`.
+- `HARDWARE.md` — canonical hardware specs (re-verify before trusting if
+  stale) and the model/runtime decision trail.
+- `scripts/lint.sh` — helm lint + helm template smoke test.
+- `.aiassistant/rules/hardware.md` and `.aiassistant/rules/helm-chart.md` —
+  equivalent always-applied rules for a different AI assistant; kept in sync
+  with the constraints below.
+
+## Hard constraints
+
+- **Zero configuration**: chart defaults are tuned specifically for
+  `rtx2000-ada-128gb-se`. Everything else is hardcoded in the chart.
+  `valuesContent` during install should stay empty in normal use.
+- **Model/runtime is fixed**: Qwen3-235B-A22B-Instruct-2507 via llama.cpp —
+  not vLLM, not DeepSeek-V4-Flash, not colibrì+GLM-5.2. Read HARDWARE.md's
+  "Model decision trail" before proposing a different model or runtime for
+  this device.
+- **Persistence** must use `hostPath` under `/opt/teknoir/local-llm`.
+- **Service type** must stay `ClusterIP` for the model API — NodePort is
+  reserved for actual web UIs on this platform.
+- **No `nvidia.com/gpu` resource request/limit.** This device's nvidia
+  runtime doesn't register GPU as a schedulable device-plugin resource;
+  setting it leaves the pod stuck Pending. GPU access is granted purely via
+  `runtimeClassName: nvidia`.
+- Do not repeat the sibling `openclaw-helm` repo's claim that this device has
+  Blackwell/NVFP4 GPUs — it's Ada Lovelace (compute capability 8.9), not
+  Blackwell.
+- Keep `README.md` short, without icons/emojis; edit it only to align with
+  actual changes made or to fix direct errors.
+
+## Commands
+
+- `./scripts/lint.sh` — runs `helm lint` and `helm template` as a smoke test.
+  No other build or test tooling exists in this repo yet.
+
+## CI/Release
+
+- `.github/workflows/beta.yml` — push to `beta` releases a pre-release chart
+  version; `charts/local-llm/Chart.yaml`'s `version` must match
+  `X.Y.Z-suffix`.
+- `.github/workflows/release.yml` — push to `main` releases a stable chart
+  version; `version` must match plain `X.Y.Z`.
+- Both are driven by `helm/chart-releaser-action` off the version field in
+  `charts/local-llm/Chart.yaml`.

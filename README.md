@@ -16,7 +16,10 @@ were ruled out).
 
 ## Usage in Teknoir platform
 
-Use the HelmChart CRD to deploy local-llm to a Device.
+Use the HelmChart CRD to deploy local-llm to a Device. A ready-to-use manifest for
+`rtx2000-ada-128gb-se` is at
+[gitops/rtx2000-ada-128gb-se.yaml](gitops/rtx2000-ada-128gb-se.yaml) — point the
+platform's GitOps source at it directly.
 
 ```yaml
 ---
@@ -26,7 +29,7 @@ metadata:
   name: local-llm
   namespace: default
 spec:
-  repo: https://<org>.github.io/local-llm  # TODO: replace once the GitHub remote exists
+  repo: https://tekn0ir.github.io/local-llm
   chart: local-llm
   targetNamespace: default
   valuesContent: |-
@@ -37,7 +40,7 @@ spec:
 ## Adding the repository
 
 ```bash
-helm repo add local-llm https://<org>.github.io/local-llm/  # TODO: replace once the GitHub remote exists
+helm repo add local-llm https://tekn0ir.github.io/local-llm/
 ```
 
 ## Installing the chart
