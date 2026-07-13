@@ -1,0 +1,6 @@
+apiVersion: v2
+name: local-llm
+description: Local LLM Helm chart for K3s on the Teknoir platform, serving Qwen3-235B-A22B-Instruct-2507 via llama.cpp.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

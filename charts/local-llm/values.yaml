@@ -1,0 +1,46 @@
+# Image configuration
+image:
+  repository: ghcr.io/ggml-org/llama.cpp
+  # TODO: pin to a digest once a known-good server-cuda build is verified for this hardware.
+  tag: server-cuda
+  # The "server-cuda" tag is mutable; pull it every time until it's pinned to a
+  # digest above, otherwise a stale cached image would never be refreshed.
+  pullPolicy: Always
+
+# GPU node placement (empty selects any node; single-node cluster)
+nodeSelector: {}
+
+# Model configuration.
+# Qwen3-235B-A22B-Instruct-2507 (235B total / 22B active MoE), served via
+# llama.cpp instead of vLLM because vLLM lacks mature CPU/RAM MoE-expert
+# offload. See HARDWARE.md for why this model/runtime was chosen over
+# DeepSeek-V4-Flash and colibri+GLM-5.2 on this device.
+model:
+  huggingfaceRepo: unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF
+  quant: UD-Q4_K_XL
+  servedName: qwen3-235b-a22b-instruct
+  contextSize: 8192
+
+# Tensor placement across the two 16GB GPUs + 125GiB host RAM.
+offload:
+  # Keep all MoE routed-expert tensors on CPU/RAM; everything else (attention,
+  # embeddings, shared layers) goes to the GPUs via -ngl 999.
+  tensorOverride: ".ffn_.*_exps.=CPU"
+  # Split evenly across the two GPUs (no NVLink between them).
+  tensorSplit: "1,1"
+
+# Persist the downloaded GGUF weights so the ~134GB download only happens once.
+persistence:
+  hostPath: /opt/teknoir/local-llm/models
+
+resources:
+  requests:
+    cpu: "8"
+    memory: 90Gi
+  limits:
+    cpu: "12"
+    memory: 116Gi
+  # No nvidia.com/gpu request/limit: this k3s device's nvidia runtime doesn't
+  # register GPU as a schedulable device-plugin resource (confirmed on-device),
+  # so setting it would leave the pod stuck Pending. GPU access is granted purely
+  # via runtimeClassName: nvidia, matching the sibling openclaw-helm chart.

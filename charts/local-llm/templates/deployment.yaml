@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: local-llm
+  labels:
+    app: local-llm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: local-llm
+  template:
+    metadata:
+      labels:
+        app: local-llm
+    spec:
+      runtimeClassName: nvidia
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+        - name: llama-server
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Qwen3-235B-A22B-Instruct-2507 (235B total / 22B active MoE) served with
+          # llama.cpp's mature CPU/RAM MoE-expert offload:
+          #   * -hf auto-downloads and caches the Unsloth GGUF quant from Hugging Face.
+          #   * -ot keeps all routed-expert tensors on CPU/RAM (they don't fit in
+          #     32GB combined VRAM).
+          #   * -ngl 999 + --tensor-split split everything else evenly across both
+          #     16GB GPUs (no NVLink between them).
+          args:
+            - -hf
+            - "{{ .Values.model.huggingfaceRepo }}:{{ .Values.model.quant }}"
+            - -c
+            - "{{ .Values.model.contextSize }}"
+            - -ngl
+            - "999"
+            - -ot
+            - "{{ .Values.offload.tensorOverride }}"
+            - --tensor-split
+            - "{{ .Values.offload.tensorSplit }}"
+            - --alias
+            - "{{ .Values.model.servedName }}"
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8080"
+            - --jinja
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            # Persist the HF-format download cache so the ~134GB GGUF is fetched only once.
+            - name: LLAMA_CACHE
+              value: /models
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          # startupProbe absorbs the slow first start (~134GB download + load across
+          # CPU+GPU); readinessProbe/livenessProbe only take over once it succeeds,
+          # so a post-startup hang is still caught and restarted instead of the pod
+          # being marked ready-forever with no liveness check.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 480
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          hostPath:
+            path: {{ .Values.persistence.hostPath }}
+            type: DirectoryOrCreate

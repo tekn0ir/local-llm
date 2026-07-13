@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: local-llm
+  labels:
+    app: local-llm
+spec:
+  type: ClusterIP
+  selector:
+    app: local-llm
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

@@ -1,0 +1,13 @@
+Local LLM ({{ .Values.model.servedName }}) is being deployed.
+
+In-cluster OpenAI-compatible endpoint:
+  http://local-llm.{{ .Release.Namespace }}.svc.cluster.local:8080/v1
+
+First start downloads ~134GB of model weights to {{ .Values.persistence.hostPath }}
+on the node and can take a long time depending on network speed; the readinessProbe
+is tuned for this.
+
+Example request once ready:
+  curl http://local-llm.{{ .Release.Namespace }}.svc.cluster.local:8080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model": "{{ .Values.model.servedName }}", "messages": [{"role": "user", "content": "Hello"}]}'

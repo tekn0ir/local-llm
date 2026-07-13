@@ -1,0 +1,7 @@
+See /Users/teknoir/.claude/plans/initialize-a-new-project-idempotent-tulip.md for the full plan.
+
+Summary: DeepSeek V4 Flash and colibrì+GLM-5.2 were both ruled out as infeasible on this hardware (2x16GB Ada GPUs, no NVLink, 125GB RAM) after live hardware inspection via tnctl and research. The sibling repo openclaw-helm's existing vLLM+DeepSeek-V4-Flash config was found to be based on an incorrect hardware assumption (claims Blackwell/NVFP4 GPUs; this device is actually Ada Lovelace) and the user confirmed it's wrong -- only its Helm/GitOps structural conventions are being reused, not its model/framework choice.
+
+Final choice: Qwen3-235B-A22B-Instruct-2507 (235B total/22B active MoE), Unsloth UD-Q4_K_XL GGUF (~134GB), served via llama.cpp with MoE expert tensors on CPU/RAM and everything else split across both GPUs -- fits the real 32GB VRAM + 125GB RAM budget on mature, mainline-supported software, prioritizing reasoning quality over throughput per the user's explicit preference.
+
+The plan creates: charts/local-llm/ (Chart.yaml, values.yaml, templates/deployment.yaml+service.yaml+NOTES.txt), HARDWARE.md, .aiassistant/rules/{helm-chart.md,hardware.md}, root README.md, CI workflows, and a lint script -- all following the exact directory/CI/persistence conventions found in observatory-pipeline-helm, profile-controller-helm, and openclaw-helm.

@@ -1,0 +1,7 @@
+.idea
+.DS_Store
+*.log
+
+# Helm dependency artifacts fetched locally (e.g. via `helm dependency update`)
+charts/*/charts/
+charts/*/tmpcharts/
