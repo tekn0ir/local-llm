@@ -6,7 +6,7 @@ apply: always
   * All configuration has defaults tuned for the `rtx2000-ada-128gb-se` device; see [HARDWARE.md](../../HARDWARE.md).
   * Everything else is hardcoded in the Helm chart.
   * Values/valuesContent during chart installation should be empty in most use cases.
-* Model/runtime choice: Qwen3-Coder-Next (80B, AWQ INT4) via vLLM (not llama.cpp,
+* Model/runtime choice: Qwen3.6-27B (AWQ 4-bit) via vLLM (not llama.cpp,
   not DeepSeek-V4-Flash, not colibrì+GLM-5.2, not the other frontier open coders).
   This was decided after live hardware inspection and research — see HARDWARE.md's
   "Model decision trail" before proposing a different model or runtime for this

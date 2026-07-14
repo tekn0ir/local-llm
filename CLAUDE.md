@@ -5,11 +5,10 @@
 Single-chart Helm GitOps repo that deploys a local LLM server to a K3s
 cluster on the Teknoir platform, targeting the device `rtx2000-ada-128gb-se`
 (2x NVIDIA RTX 2000 Ada, 32GB combined VRAM, 125GB RAM). The model backend is
-**Qwen3-Coder-Next** (80B total / 3B active MoE, AWQ INT4) served via **vLLM**,
-tensor-parallel across both GPUs with the remainder that doesn't fit in VRAM
-spilled to system RAM via CPU offload. See [README.md](README.md) for
-usage/install and [HARDWARE.md](HARDWARE.md) for the device specs and full
-model/runtime decision trail.
+**Qwen3.6-27B** (AWQ 4-bit) served via **vLLM**, tensor-parallel across both
+GPUs with no CPU offload. See [README.md](README.md) for usage/install and
+[HARDWARE.md](HARDWARE.md) for the device specs and full model/runtime
+decision trail.
 
 ## Key files
 
@@ -29,7 +28,7 @@ model/runtime decision trail.
 - **Zero configuration**: chart defaults are tuned specifically for
   `rtx2000-ada-128gb-se`. Everything else is hardcoded in the chart.
   `valuesContent` during install should stay empty in normal use.
-- **Model/runtime is fixed**: Qwen3-Coder-Next (80B, AWQ INT4) via vLLM — not
+- **Model/runtime is fixed**: Qwen3.6-27B (AWQ 4-bit) via vLLM — not
   llama.cpp, not DeepSeek-V4-Flash, not colibrì+GLM-5.2, not the other frontier
   open coders (GLM-5.2, DeepSeek V4, Qwen3-Coder-480B). Read HARDWARE.md's
   "Model decision trail" before proposing a different model or runtime for

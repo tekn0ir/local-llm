@@ -3,15 +3,11 @@
 This chart deploys a local LLM server to a K3s cluster using the HelmChart CRD and
 controller. Persistence uses hostPath under `/opt/teknoir/local-llm`.
 
-The model backend serves **Qwen3-Coder-Next** (80B total / 3B active MoE), a
-coding/agentic specialist, via **vLLM**, using the `bullpoint/Qwen3-Coder-Next-AWQ-4bit`
-AWQ INT4 checkpoint (~40GB). The model is split across both GPUs with tensor
-parallelism, and the remainder that doesn't fit in 32GB combined VRAM is spilled to
-system RAM via vLLM's CPU offload. This is dense, PCIe-bound offload, so throughput
-is modest — the tradeoff accepted for the 80B's coding quality over a smaller model
-that fits entirely in VRAM. See [HARDWARE.md](HARDWARE.md) for the target device's
-specs and the full model/runtime decision trail (why DeepSeek-V4-Flash,
-colibrì+GLM-5.2, and the other open coders were ruled out).
+The model backend serves **Qwen3.6-27B** served via **vLLM**, using the `QuantTrio/Qwen3.6-27B-AWQ`
+AWQ 4-bit checkpoint (~21GB). The model is split across both GPUs with tensor
+parallelism, fitting entirely in 32GB combined VRAM with no CPU offload. It is optimized with
+MTP (Multi-Token Prediction) speculative decoding for faster execution. See [HARDWARE.md](HARDWARE.md) for the target device's
+specs and the full model/runtime decision trail (why the 80B CPU-offloaded setup was replaced, and other options ruled out).
 
 The chart also deploys [Open WebUI](https://github.com/open-webui/open-webui) as a
 chat interface for testing/evaluating the model, wired to vLLM's

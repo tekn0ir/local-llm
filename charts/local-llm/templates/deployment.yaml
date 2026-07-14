@@ -23,14 +23,12 @@ spec:
         - name: vllm
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Qwen3-Coder-Next (80B total / 3B active MoE), AWQ INT4, served with
-          # vLLM's native Qwen3-Next hybrid DeltaNet+MoE support. The image's
-          # ENTRYPOINT is already `vllm serve`, so args start with the model:
+          # Qwen3.6-27B (AWQ 4-bit, ~21GiB), served with vLLM.
+          # The image's ENTRYPOINT is already `vllm serve`, so args start with the model:
           #   * vLLM auto-downloads and caches the AWQ checkpoint from Hugging Face.
           #   * --tensor-parallel-size splits the model across both 16GB GPUs.
-          #   * --cpu-offload-gb spills the remainder that doesn't fit in 32GB
-          #     combined VRAM to system RAM (dense, PCIe-bound offload).
-          #   * --tool-call-parser qwen3_coder enables agentic tool calling.
+          #   * --tool-call-parser and --reasoning-parser enable structured outputs and reasoning.
+          #   * --speculative-config configures MTP (Multi-Token Prediction) speculative decoding.
           args:
             - "{{ .Values.model.huggingfaceRepo }}"
             - --tensor-parallel-size
@@ -39,15 +37,18 @@ spec:
             # so vLLM's custom all-reduce (which needs P2P) can't work; disable
             # it and fall back to NCCL. See NCCL_* env below.
             - --disable-custom-all-reduce
-            - --cpu-offload-gb
-            - "{{ .Values.vllm.cpuOffloadGb }}"
             - --max-model-len
             - "{{ .Values.model.maxModelLen }}"
             - --gpu-memory-utilization
             - "{{ .Values.vllm.gpuMemoryUtilization }}"
+            - --trust-remote-code
             - --enable-auto-tool-choice
             - --tool-call-parser
             - "{{ .Values.model.toolCallParser }}"
+            - --reasoning-parser
+            - "{{ .Values.model.reasoningParser }}"
+            - --speculative-config
+            - '{{ .Values.vllm.speculative | toJson }}'
             - --served-model-name
             - "{{ .Values.model.servedName }}"
             # Server-side sampling defaults (temperature/top_p/top_k) used
@@ -63,7 +64,7 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            # Persist the Hugging Face download cache so the ~40GB AWQ checkpoint
+            # Persist the Hugging Face download cache so the ~21GB AWQ checkpoint
             # is fetched only once.
             - name: HF_HOME
               value: /models
@@ -82,18 +83,21 @@ spec:
             # multi-GPU startup is confirmed stable on device.
             - name: NCCL_DEBUG
               value: "INFO"
-            # Reduce CUDA allocator fragmentation during weight load + the
-            # Marlin MoE repack, which run the card right up to its limit here
-            # (the repack alloc/frees a 256MB transient per expert group and
-            # OOMs by a hair). vLLM's own OOM message recommends this. NOTE:
+            # Reduce CUDA allocator fragmentation during weight load. NOTE:
             # this torch build renamed the var -- PYTORCH_CUDA_ALLOC_CONF is
             # deprecated and was being ignored, so the effective name is
             # PYTORCH_ALLOC_CONF.
             - name: PYTORCH_ALLOC_CONF
               value: expandable_segments:True
+            # FlashInfer/allocator and idle-sleep environment variables to optimize 
+            # performance on this target device.
+            - name: VLLM_USE_FLASHINFER_SAMPLER
+              value: "0"
+            - name: VLLM_SLEEP_WHEN_IDLE
+              value: "1"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          # startupProbe absorbs the slow first start (~40GB download + load across
+          # startupProbe absorbs the slow first start (~21GB download + load across
           # CPU+GPU); readinessProbe/livenessProbe only take over once it succeeds,
           # so a post-startup hang is still caught and restarted instead of the pod
           # being marked ready-forever with no liveness check.

@@ -110,6 +110,21 @@ Re-picked the model for **coding** and switched serving frameworks to **vLLM**
     entirely in 32GB VRAM with no CPU offload needed at all -- sidestepping
     this bug class rather than working around it.
 
+### Switch to Qwen3.6-27B on vLLM (2026-07)
+
+Switched the default model to **Qwen3.6-27B** served via **vLLM** to fully eliminate CPU offload while maintaining 128K context and enabling MTP (Multi-Token Prediction) speculative decoding:
+
+- **Chosen: Qwen3.6-27B-AWQ** (AWQ 4-bit, ~21GiB), using the `QuantTrio/Qwen3.6-27B-AWQ` checkpoint.
+- **Why this model fits without CPU offload:**
+  - Weights are ~21GiB. Split across two cards via `--tensor-parallel-size 2` (TP=2), that's only **~10.5GB of weights per GPU**.
+  - At `--gpu-memory-utilization 0.90` (usable VRAM of ~14GB out of 15.57GB), this leaves ~3.5GB/GPU.
+  - Qwen3.6-27B uses gated-delta hybrid attention (constant-size state on most layers, similar to the 80B), so 128K context is very cheap at **~1.5GB/GPU** of KV cache.
+  - The remaining ~2GB/GPU comfortably covers CUDA graphs, activations, and the small MTP draft head.
+  - This eliminates the PCIe-bound CPU offload entirely, making execution fast and sidestepping the upstream Marlin MoE-repack OOM bug that blocked the 80B.
+- **MTP Speculative Decoding:** Enabled via `--speculative-config '{"method":"qwen3_next_mtp","num_speculative_tokens":1}'` for faster decoding speeds.
+- **Reasoning + Tool-Call Parsers:** Added `--reasoning-parser qwen3` alongside the existing `--tool-call-parser qwen3_coder` for robust agentic behavior.
+- **Env modifications:** Added FlashInfer/idle environmental variables (`VLLM_USE_FLASHINFER_SAMPLER=0`, `VLLM_SLEEP_WHEN_IDLE=1`) and `--trust-remote-code` for optimal execution.
+
 ## Re-verifying
 
 Specs can drift (driver updates, hardware swaps). Before trusting this document for

@@ -3,13 +3,7 @@ image:
   repository: vllm/vllm-openai
   # TODO: pin to a digest once a known-good build is verified for this hardware.
   # Must be >= v0.15.0 -- earlier releases don't load the Qwen3-Next hybrid
-  # DeltaNet+MoE architecture. Bumped to the latest release to test whether it
-  # fixes a known upstream bug (vllm-project/vllm#21864, #37883): CPU-offloaded
-  # (UVA) MoE weights appear as device='cuda' but are physically on CPU, and
-  # the Marlin repack in process_weights_after_loading allocates a full-size
-  # GPU buffer for the packed output without accounting for that, OOMing on
-  # v0.15.0 regardless of how much is offloaded. If this still OOMs the same
-  # way, the bug isn't fixed here either -- see HARDWARE.md for the fallback.
+  # DeltaNet+MoE architecture.
   tag: v0.25.1
   # The tag is mutable; pull it every time until it's pinned to a digest
   # above, otherwise a stale cached image would never be refreshed.
@@ -19,23 +13,19 @@ image:
 nodeSelector: {}
 
 # Model configuration.
-# Qwen3-Coder-Next (80B total / 3B active MoE), a coding/agentic specialist,
-# served via vLLM instead of llama.cpp for its native Qwen3-Next hybrid
-# DeltaNet+MoE support, multi-token prediction, and qwen3_coder tool-call
-# parser. See HARDWARE.md for why this model/runtime was chosen over the
-# frontier open coders (GLM-5.2, DeepSeek V4, Qwen3-Coder-480B) and over the
-# 30B-that-fits-in-VRAM alternative on this device.
+# Qwen3.6-27B (AWQ 4-bit, ~21GiB), served via vLLM. It fits entirely in the 2x RTX 2000 Ada
+# GPUs (32GB combined VRAM) with no CPU offload, at 128K context, with MTP (Multi-Token
+# Prediction) speculative decoding enabled for faster decode.
+# See HARDWARE.md for why this model was chosen.
 model:
-  huggingfaceRepo: bullpoint/Qwen3-Coder-Next-AWQ-4bit
-  servedName: qwen3-coder-next
-  # 131072 = 128K, half the model's 256K native max. KV cache is cheap here
-  # regardless: only 12 of 48 layers do full attention (2 KV heads, 256 head
-  # dim); the rest are Gated DeltaNet with constant-size state that doesn't
-  # grow with context length. That works out to ~12KB/token/GPU at TP=2, so
-  # 128K context costs only ~1.5GB/GPU. Verify against free VRAM on device;
-  # lower here first if it OOMs.
+  huggingfaceRepo: QuantTrio/Qwen3.6-27B-AWQ
+  servedName: qwen3.6-27b
+  # 131072 = 128K, half the model's 256K native max. KV cache is cheap here:
+  # Qwen3.6-27B uses gated-delta hybrid attention (constant-size state on most layers)
+  # so 128K context costs only ~1.5GB/GPU at TP=2.
   maxModelLen: 131072
   toolCallParser: qwen3_coder
+  reasoningParser: qwen3
   # Server-side sampling defaults applied when a client doesn't set them
   # explicitly, via --override-generation-config. Keys are vLLM/HF generation
   # config field names (snake_case), not chart convention -- they're
@@ -45,33 +35,20 @@ model:
     top_p: 0.95
     top_k: 20
 
-# Tensor placement across the two 16GB GPUs + 125GiB host RAM.
+# Tensor placement across the two 16GB GPUs with no CPU offload.
 vllm:
   # Split the model across both GPUs (no NVLink between them).
   tensorParallelSize: 2
-  # The 80B AWQ INT4 checkpoint doesn't fit in 32GB combined VRAM; spill this
-  # many GB *per GPU* to system RAM via vLLM's CPU offload path. Dense,
-  # PCIe-bound, slower than llama.cpp's expert-specific offload, but keeps the
-  # 80B's coding quality. Measured on device at v0.15.0: 12GB/GPU and 20GB/GPU
-  # both left ~15.3-15.4GB of weights resident per card and OOMed identically
-  # in the Marlin MoE repack -- raising the offload budget had no effect,
-  # which is the fingerprint of the upstream CPU-offload/MoE-repack bug noted
-  # above, not an undersized budget. Pushed to 32GB/GPU (above the ~24-27GB/GPU
-  # weight shard itself) so that *if* the newer vLLM's repack path correctly
-  # respects offloaded tensors, as little as possible stays resident; if the
-  # bug is still present this will fail the same way regardless of the value.
-  # ~64GB total offloaded to RAM (well within 125GB). Lower for more speed
-  # once it starts cleanly.
-  cpuOffloadGb: 32
-  # No explicit --quantization: the bullpoint checkpoint is packaged as
-  # compressed-tensors (an llm-compressor AWQ recipe), not vLLM's native AWQ
-  # format, and vLLM errors out if the flag doesn't match what's baked into
-  # the checkpoint's own config. Let vLLM auto-detect it instead -- this
+  # No explicit --quantization: let vLLM auto-detect it instead -- this
   # matches the checkpoint's own documented launch command. FP8 W8A8 is also
   # supported on Ada (cc 8.9) but its ~92GB footprint is far too large here.
   gpuMemoryUtilization: 0.90
+  # MTP (Multi-Token Prediction) speculative decoding configuration.
+  speculative:
+    method: qwen3_next_mtp
+    num_speculative_tokens: 1
 
-# Persist the downloaded AWQ weights so the ~40GB download only happens once.
+# Persist the downloaded AWQ weights so the ~21GB download only happens once.
 persistence:
   hostPath: /opt/teknoir/local-llm/models
 
