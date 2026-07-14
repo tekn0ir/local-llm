@@ -28,15 +28,22 @@ nodeSelector: {}
 model:
   huggingfaceRepo: bullpoint/Qwen3-Coder-Next-AWQ-4bit
   servedName: qwen3-coder-next
-  # 262144 = the model's full native context. KV cache is cheap here despite
-  # the size: only 12 of 48 layers do full attention (2 KV heads, 256 head
+  # 131072 = 128K, half the model's 256K native max. KV cache is cheap here
+  # regardless: only 12 of 48 layers do full attention (2 KV heads, 256 head
   # dim); the rest are Gated DeltaNet with constant-size state that doesn't
   # grow with context length. That works out to ~12KB/token/GPU at TP=2, so
-  # the full 256K context costs only ~3GB/GPU -- cpuOffloadGb below is sized
-  # to leave that much headroom above the weights. Verify against free VRAM
-  # on device; lower here first if it OOMs.
-  maxModelLen: 262144
+  # 128K context costs only ~1.5GB/GPU. Verify against free VRAM on device;
+  # lower here first if it OOMs.
+  maxModelLen: 131072
   toolCallParser: qwen3_coder
+  # Server-side sampling defaults applied when a client doesn't set them
+  # explicitly, via --override-generation-config. Keys are vLLM/HF generation
+  # config field names (snake_case), not chart convention -- they're
+  # serialized to JSON verbatim.
+  samplingDefaults:
+    temperature: 0.6
+    top_p: 0.95
+    top_k: 20
 
 # Tensor placement across the two 16GB GPUs + 125GiB host RAM.
 vllm:

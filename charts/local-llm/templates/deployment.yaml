@@ -50,6 +50,10 @@ spec:
             - "{{ .Values.model.toolCallParser }}"
             - --served-model-name
             - "{{ .Values.model.servedName }}"
+            # Server-side sampling defaults (temperature/top_p/top_k) used
+            # when a client request doesn't set them explicitly.
+            - --override-generation-config
+            - '{{ .Values.model.samplingDefaults | toJson }}'
             - --host
             - "0.0.0.0"
             - --port
