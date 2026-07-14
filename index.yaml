@@ -3,6 +3,17 @@ entries:
   local-llm:
   - apiVersion: v2
     appVersion: 1.0.0
+    created: "2026-07-14T05:38:17.824283055Z"
+    description: Local LLM Helm chart for K3s on the Teknoir platform, serving Qwen3-Coder-Next-80B
+      (AWQ INT4) via vLLM.
+    digest: c01d14d1b3bda3dd78c204802903f4e6b4ea750c5a9d5b06525f8eb04b5c3ff2
+    name: local-llm
+    type: application
+    urls:
+    - https://github.com/tekn0ir/local-llm/releases/download/local-llm-0.3.0/local-llm-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v2
+    appVersion: 1.0.0
     created: "2026-07-13T11:07:01.685143566Z"
     description: Local LLM Helm chart for K3s on the Teknoir platform, serving Qwen3-235B-A22B-Instruct-2507
       via llama.cpp.
@@ -23,4 +34,4 @@ entries:
     urls:
     - https://github.com/tekn0ir/local-llm/releases/download/local-llm-0.1.1/local-llm-0.1.1.tgz
     version: 0.1.1
-generated: "2026-07-13T11:07:01.685154853Z"
+generated: "2026-07-14T05:38:17.824294757Z"
