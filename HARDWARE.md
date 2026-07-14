@@ -81,18 +81,34 @@ Re-picked the model for **coding** and switched serving frameworks to **vLLM**
     shared-memory/host staging) and `--disable-custom-all-reduce` (vLLM's
     custom all-reduce also needs P2P). This is the same "verify TP sees both
     GPUs" risk flagged during the switch, resolved.
-  - **CPU-offload sizing (measured).** Past the NCCL fix, the next failure was
-    a CUDA OOM during `process_weights_after_loading` (the Marlin MoE weight
-    repack, `gptq_marlin_moe_repack`), not during KV allocation. At
+  - **CPU-offload sizing (measured) -- then a known upstream bug.** Past the
+    NCCL fix, the next failure was a CUDA OOM during
+    `process_weights_after_loading` (the Marlin MoE weight repack,
+    `gptq_marlin_moe_repack`), not during KV allocation. At
     `--cpu-offload-gb 12` roughly 15.1GB of weights stayed resident per card,
     filling the 15.57GB GPU and leaving no room for the repack (~256MB short).
-    The model materializes to ~27GB/GPU (~54GB total) here, so offload must be
-    sized generously: `--cpu-offload-gb 20` drops resident weights to ~7GB and
-    leaves ~8GB/GPU for the repack, the 256K KV cache (~3GB/GPU), and
-    activations; ~40GB total lands in host RAM. Also set
-    `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` to curb allocator
-    fragmentation, as the OOM message recommends. Dial offload back down for
-    throughput only once startup is clean.
+    Raising to `--cpu-offload-gb 20` was expected to free several more GB but
+    measured resident weights barely moved (15.3-15.4GB either way) and the
+    repack OOMed identically -- the offload budget wasn't the bottleneck.
+    This matches a documented upstream vLLM bug
+    ([#21864](https://github.com/vllm-project/vllm/issues/21864),
+    [#37883](https://github.com/vllm-project/vllm/issues/37883)): CPU-offload
+    uses UVA/pinned memory, so offloaded tensors report `device.type=='cuda'`
+    while physically living in CPU RAM, and the Marlin repack allocates a
+    full-size GPU output buffer without accounting for that -- it OOMs
+    regardless of how much is offloaded, on v0.15.0. An open RFC
+    ([#38256](https://github.com/vllm-project/vllm/issues/38256)) shows the
+    vLLM team considers the current MoE-offload mechanism inadequate and is
+    redesigning it. Response: bump `image.tag` to `v0.25.1` (latest at the
+    time) to test whether a newer release fixed the repack path, keep
+    `cpuOffloadGb` at 32/GPU (above the ~24-27GB/GPU weight shard, so if the
+    fix landed as little as possible stays resident) and
+    `PYTORCH_ALLOC_CONF=expandable_segments:True` (renamed from
+    `PYTORCH_CUDA_ALLOC_CONF`, which this torch build ignores) to curb
+    allocator fragmentation. If v0.25.1 OOMs the same way, the bug is still
+    present and the reliable fallback is **Qwen3-Coder-Next-30B**, which fits
+    entirely in 32GB VRAM with no CPU offload needed at all -- sidestepping
+    this bug class rather than working around it.
 
 ## Re-verifying
 

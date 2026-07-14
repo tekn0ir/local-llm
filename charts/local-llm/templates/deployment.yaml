@@ -79,9 +79,13 @@ spec:
             - name: NCCL_DEBUG
               value: "INFO"
             # Reduce CUDA allocator fragmentation during weight load + the
-            # Marlin MoE repack, which run the card right up to its limit here.
-            # vLLM's own OOM message recommends this.
-            - name: PYTORCH_CUDA_ALLOC_CONF
+            # Marlin MoE repack, which run the card right up to its limit here
+            # (the repack alloc/frees a 256MB transient per expert group and
+            # OOMs by a hair). vLLM's own OOM message recommends this. NOTE:
+            # this torch build renamed the var -- PYTORCH_CUDA_ALLOC_CONF is
+            # deprecated and was being ignored, so the effective name is
+            # PYTORCH_ALLOC_CONF.
+            - name: PYTORCH_ALLOC_CONF
               value: expandable_segments:True
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

@@ -3,8 +3,14 @@ image:
   repository: vllm/vllm-openai
   # TODO: pin to a digest once a known-good build is verified for this hardware.
   # Must be >= v0.15.0 -- earlier releases don't load the Qwen3-Next hybrid
-  # DeltaNet+MoE architecture.
-  tag: v0.15.0
+  # DeltaNet+MoE architecture. Bumped to the latest release to test whether it
+  # fixes a known upstream bug (vllm-project/vllm#21864, #37883): CPU-offloaded
+  # (UVA) MoE weights appear as device='cuda' but are physically on CPU, and
+  # the Marlin repack in process_weights_after_loading allocates a full-size
+  # GPU buffer for the packed output without accounting for that, OOMing on
+  # v0.15.0 regardless of how much is offloaded. If this still OOMs the same
+  # way, the bug isn't fixed here either -- see HARDWARE.md for the fallback.
+  tag: v0.25.1
   # The tag is mutable; pull it every time until it's pinned to a digest
   # above, otherwise a stale cached image would never be refreshed.
   pullPolicy: Always
@@ -39,13 +45,17 @@ vllm:
   # The 80B AWQ INT4 checkpoint doesn't fit in 32GB combined VRAM; spill this
   # many GB *per GPU* to system RAM via vLLM's CPU offload path. Dense,
   # PCIe-bound, slower than llama.cpp's expert-specific offload, but keeps the
-  # 80B's coding quality. Measured on device: at 12GB/GPU offload ~15.1GB of
-  # weights stayed resident per card, filling the 15.57GB GPU and OOMing the
-  # Marlin MoE weight repack (process_weights_after_loading) by ~256MB. 20GB
-  # offload drops resident weights to ~7GB, leaving ~8GB/GPU for the repack,
-  # the 256K KV cache (~3GB/GPU), and activations. ~40GB total offloaded to
-  # RAM (well within 125GB). Lower for more speed once it starts cleanly.
-  cpuOffloadGb: 20
+  # 80B's coding quality. Measured on device at v0.15.0: 12GB/GPU and 20GB/GPU
+  # both left ~15.3-15.4GB of weights resident per card and OOMed identically
+  # in the Marlin MoE repack -- raising the offload budget had no effect,
+  # which is the fingerprint of the upstream CPU-offload/MoE-repack bug noted
+  # above, not an undersized budget. Pushed to 32GB/GPU (above the ~24-27GB/GPU
+  # weight shard itself) so that *if* the newer vLLM's repack path correctly
+  # respects offloaded tensors, as little as possible stays resident; if the
+  # bug is still present this will fail the same way regardless of the value.
+  # ~64GB total offloaded to RAM (well within 125GB). Lower for more speed
+  # once it starts cleanly.
+  cpuOffloadGb: 32
   # No explicit --quantization: the bullpoint checkpoint is packaged as
   # compressed-tensors (an llm-compressor AWQ recipe), not vLLM's native AWQ
   # format, and vLLM errors out if the flag doesn't match what's baked into
@@ -61,10 +71,10 @@ persistence:
 resources:
   requests:
     cpu: "8"
-    memory: 40Gi
+    memory: 72Gi
   limits:
     cpu: "12"
-    memory: 80Gi
+    memory: 100Gi
   # No nvidia.com/gpu request/limit: this k3s device's nvidia runtime doesn't
   # register GPU as a schedulable device-plugin resource (confirmed on-device),
   # so setting it would leave the pod stuck Pending. GPU access is granted purely
