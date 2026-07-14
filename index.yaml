@@ -3,6 +3,17 @@ entries:
   local-llm:
   - apiVersion: v2
     appVersion: 1.0.0
+    created: "2026-07-14T11:16:15.685952353Z"
+    description: Local LLM deployment with vLLM and Open WebUI on rtx2000-ada-128gb-se
+      (Qwen3.6-27B AWQ, no CPU offload, MTP)
+    digest: b34fd4ebcb35d216a0ee99373502a9fda91df5902dc82533fd199cc44cceb68b
+    name: local-llm
+    type: application
+    urls:
+    - https://github.com/tekn0ir/local-llm/releases/download/local-llm-0.5.0/local-llm-0.5.0.tgz
+    version: 0.5.0
+  - apiVersion: v2
+    appVersion: 1.0.0
     created: "2026-07-14T09:43:20.853559032Z"
     description: Local LLM deployment with vLLM and Open WebUI on rtx2000-ada-128gb-se
       (Qwen3.6-27B AWQ, no CPU offload, MTP)
@@ -100,4 +111,4 @@ entries:
     urls:
     - https://github.com/tekn0ir/local-llm/releases/download/local-llm-0.1.1/local-llm-0.1.1.tgz
     version: 0.1.1
-generated: "2026-07-14T09:43:20.853597304Z"
+generated: "2026-07-14T11:16:15.686005203Z"
