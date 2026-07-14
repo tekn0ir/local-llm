@@ -52,6 +52,8 @@ vllm:
   enforceEager: true
   # KV-cache quantization (optional; leave empty for default/auto).
   kvCacheDtype: fp8
+  # NodePort for the vLLM service
+  nodePort: 30008
   # MTP (Multi-Token Prediction) speculative decoding configuration.
   speculative:
     method: qwen3_next_mtp
