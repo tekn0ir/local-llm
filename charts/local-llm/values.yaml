@@ -44,9 +44,12 @@ vllm:
   # for the full 256K context's KV cache (~3GB/GPU) plus activations/CUDA
   # graphs. Tune against free VRAM on device.
   cpuOffloadGb: 12
-  # AWQ Marlin is the fast, supported 4-bit kernel on Ada (cc 8.9); FP8 W8A8
-  # is also supported here but its ~92GB footprint is far too large.
-  quantization: awq_marlin
+  # No explicit --quantization: the bullpoint checkpoint is packaged as
+  # compressed-tensors (an llm-compressor AWQ recipe), not vLLM's native AWQ
+  # format, and vLLM errors out if the flag doesn't match what's baked into
+  # the checkpoint's own config. Let vLLM auto-detect it instead -- this
+  # matches the checkpoint's own documented launch command. FP8 W8A8 is also
+  # supported on Ada (cc 8.9) but its ~92GB footprint is far too large here.
   gpuMemoryUtilization: 0.90
 
 # Persist the downloaded AWQ weights so the ~40GB download only happens once.

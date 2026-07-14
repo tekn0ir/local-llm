@@ -55,8 +55,11 @@ Re-picked the model for **coding** and switched serving frameworks to **vLLM**
   - vLLM was chosen over llama.cpp here because it natively supports the
     Qwen3-Next hybrid DeltaNet+MoE architecture (since Sep 2025), multi-token
     prediction, and a dedicated `qwen3_coder` tool-call parser for agentic use.
-  - Quant: **AWQ Marlin** is the fast, supported 4-bit kernel on this Ada
-    (cc 8.9) hardware. FP8 W8A8 is also supported on Ada but its ~92GB
+  - Quant: the checkpoint is packaged as **compressed-tensors** (an
+    llm-compressor AWQ recipe), not vLLM's native AWQ format -- vLLM must
+    auto-detect the quantization method rather than being told `awq_marlin`
+    explicitly, or it errors out on a mismatch with the checkpoint's own
+    config. FP8 W8A8 is also supported on Ada (cc 8.9) but its ~92GB
     footprint is far too large for this budget. GGUF is not vLLM's native path.
   - **Critical hardware reality:** the 80B at 4-bit (~40GB) does not fit in
     32GB combined VRAM, so vLLM spills part of the weights to system RAM via

@@ -37,8 +37,6 @@ spec:
             - "{{ .Values.vllm.tensorParallelSize }}"
             - --cpu-offload-gb
             - "{{ .Values.vllm.cpuOffloadGb }}"
-            - --quantization
-            - "{{ .Values.vllm.quantization }}"
             - --max-model-len
             - "{{ .Values.model.maxModelLen }}"
             - --gpu-memory-utilization
