@@ -3,6 +3,17 @@ entries:
   local-llm:
   - apiVersion: v2
     appVersion: 1.0.0
+    created: "2026-07-14T09:43:20.853559032Z"
+    description: Local LLM deployment with vLLM and Open WebUI on rtx2000-ada-128gb-se
+      (Qwen3.6-27B AWQ, no CPU offload, MTP)
+    digest: e0e726518b7bde1dc5a2fc1693c1bdabe8712f00c4caee9f4518ac916a20de4e
+    name: local-llm
+    type: application
+    urls:
+    - https://github.com/tekn0ir/local-llm/releases/download/local-llm-0.4.0/local-llm-0.4.0.tgz
+    version: 0.4.0
+  - apiVersion: v2
+    appVersion: 1.0.0
     created: "2026-07-14T09:22:51.276154143Z"
     description: Local LLM Helm chart for K3s on the Teknoir platform, serving Qwen3-Coder-Next-80B
       (AWQ INT4) via vLLM.
@@ -89,4 +100,4 @@ entries:
     urls:
     - https://github.com/tekn0ir/local-llm/releases/download/local-llm-0.1.1/local-llm-0.1.1.tgz
     version: 0.1.1
-generated: "2026-07-14T09:22:51.276191272Z"
+generated: "2026-07-14T09:43:20.853597304Z"
