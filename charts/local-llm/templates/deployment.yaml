@@ -41,6 +41,12 @@ spec:
             - "{{ .Values.model.maxModelLen }}"
             - --gpu-memory-utilization
             - "{{ .Values.vllm.gpuMemoryUtilization }}"
+            {{- if .Values.vllm.enforceEager }}
+            # Disable CUDA-graph capture. Graph capture profiles/reserves an
+            # extra activation buffer at startup that OOMs on these 16GB GPUs;
+            # eager mode skips it, trading a small decode-speed cost for a fit.
+            - --enforce-eager
+            {{- end }}
             - --trust-remote-code
             - --enable-auto-tool-choice
             - --tool-call-parser

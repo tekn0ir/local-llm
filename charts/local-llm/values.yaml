@@ -14,16 +14,19 @@ nodeSelector: {}
 
 # Model configuration.
 # Qwen3.6-27B (AWQ 4-bit, ~21GiB), served via vLLM. It fits entirely in the 2x RTX 2000 Ada
-# GPUs (32GB combined VRAM) with no CPU offload, at 128K context, with MTP (Multi-Token
-# Prediction) speculative decoding enabled for faster decode.
+# GPUs (32GB combined VRAM) with no CPU offload, at 64K context, with MTP (Multi-Token
+# Prediction) speculative decoding enabled for faster decode. CUDA graphs are disabled
+# (--enforce-eager) to avoid a startup OOM on these 16GB GPUs.
 # See HARDWARE.md for why this model was chosen.
 model:
   huggingfaceRepo: QuantTrio/Qwen3.6-27B-AWQ
   servedName: qwen3.6-27b
-  # 131072 = 128K, half the model's 256K native max. KV cache is cheap here:
-  # Qwen3.6-27B uses gated-delta hybrid attention (constant-size state on most layers)
-  # so 128K context costs only ~1.5GB/GPU at TP=2.
-  maxModelLen: 131072
+  # 65536 = 64K, a quarter of the model's 256K native max. KV cache is cheap here
+  # (Qwen3.6-27B uses gated-delta hybrid attention -- constant-size state on most
+  # layers), but a shorter context shrinks activation/scratch buffers and leaves
+  # room for KV-cache profiling, which together with --enforce-eager clears the
+  # startup OOM on these 16GB GPUs. Raise back toward 131072 on hardware that fits.
+  maxModelLen: 65536
   toolCallParser: qwen3_coder
   reasoningParser: qwen3
   # Server-side sampling defaults applied when a client doesn't set them
@@ -43,6 +46,10 @@ vllm:
   # matches the checkpoint's own documented launch command. FP8 W8A8 is also
   # supported on Ada (cc 8.9) but its ~92GB footprint is far too large here.
   gpuMemoryUtilization: 0.90
+  # Disable CUDA-graph capture (--enforce-eager). Graph capture reserves an extra
+  # activation buffer at startup that OOMs here; eager mode skips it for a small
+  # decode-speed cost. Set false to re-enable graphs once VRAM headroom allows.
+  enforceEager: true
   # MTP (Multi-Token Prediction) speculative decoding configuration.
   speculative:
     method: qwen3_next_mtp

@@ -125,6 +125,23 @@ Switched the default model to **Qwen3.6-27B** served via **vLLM** to fully elimi
 - **Reasoning + Tool-Call Parsers:** Added `--reasoning-parser qwen3` alongside the existing `--tool-call-parser qwen3_coder` for robust agentic behavior.
 - **Env modifications:** Added FlashInfer/idle environmental variables (`VLLM_USE_FLASHINFER_SAMPLER=0`, `VLLM_SLEEP_WHEN_IDLE=1`) and `--trust-remote-code` for optimal execution.
 
+### Startup OOM fix: enforce-eager + 64K context (2026-07)
+
+Despite the no-offload fit above, startup still OOMed during CUDA-graph capture
+(the `profile_cudagraph_memory` allocation) on these 16GB GPUs. Two cheap,
+low-risk knobs cleared it:
+
+- **`--enforce-eager` (disable CUDA-graph capture).** Graph capture profiles and
+  reserves an extra activation buffer at startup — precisely the allocation that
+  was failing. Eager mode skips it, trading a small decode-speed cost for a
+  reliable fit. Exposed as `vllm.enforceEager` (default `true`); flip it off to
+  re-enable graphs once VRAM headroom allows.
+- **`--max-model-len` 131072 → 65536 (128K → 64K).** A shorter context shrinks
+  the activation/scratch buffers and leaves room for KV-cache profiling. This
+  alone often clears the OOM; combined with `--enforce-eager` it removes the
+  failing allocation entirely. Raise `model.maxModelLen` back toward 131072 on
+  hardware with more headroom.
+
 ## Re-verifying
 
 Specs can drift (driver updates, hardware swaps). Before trusting this document for
