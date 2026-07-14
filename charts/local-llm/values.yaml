@@ -1,54 +1,74 @@
 # Image configuration
 image:
-  repository: ghcr.io/ggml-org/llama.cpp
-  # TODO: pin to a digest once a known-good server-cuda build is verified for this hardware.
-  tag: server-cuda
-  # The "server-cuda" tag is mutable; pull it every time until it's pinned to a
-  # digest above, otherwise a stale cached image would never be refreshed.
+  repository: vllm/vllm-openai
+  # TODO: pin to a digest once a known-good build is verified for this hardware.
+  # Must be >= v0.15.0 -- earlier releases don't load the Qwen3-Next hybrid
+  # DeltaNet+MoE architecture.
+  tag: v0.15.0
+  # The tag is mutable; pull it every time until it's pinned to a digest
+  # above, otherwise a stale cached image would never be refreshed.
   pullPolicy: Always
 
 # GPU node placement (empty selects any node; single-node cluster)
 nodeSelector: {}
 
 # Model configuration.
-# Qwen3-235B-A22B-Instruct-2507 (235B total / 22B active MoE), served via
-# llama.cpp instead of vLLM because vLLM lacks mature CPU/RAM MoE-expert
-# offload. See HARDWARE.md for why this model/runtime was chosen over
-# DeepSeek-V4-Flash and colibri+GLM-5.2 on this device.
+# Qwen3-Coder-Next (80B total / 3B active MoE), a coding/agentic specialist,
+# served via vLLM instead of llama.cpp for its native Qwen3-Next hybrid
+# DeltaNet+MoE support, multi-token prediction, and qwen3_coder tool-call
+# parser. See HARDWARE.md for why this model/runtime was chosen over the
+# frontier open coders (GLM-5.2, DeepSeek V4, Qwen3-Coder-480B) and over the
+# 30B-that-fits-in-VRAM alternative on this device.
 model:
-  huggingfaceRepo: unsloth/Qwen3-235B-A22B-Instruct-2507-GGUF
-  quant: UD-Q4_K_XL
-  servedName: qwen3-235b-a22b-instruct
-  contextSize: 8192
+  huggingfaceRepo: bullpoint/Qwen3-Coder-Next-AWQ-4bit
+  servedName: qwen3-coder-next
+  # 262144 = the model's full native context. KV cache is cheap here despite
+  # the size: only 12 of 48 layers do full attention (2 KV heads, 256 head
+  # dim); the rest are Gated DeltaNet with constant-size state that doesn't
+  # grow with context length. That works out to ~12KB/token/GPU at TP=2, so
+  # the full 256K context costs only ~3GB/GPU -- cpuOffloadGb below is sized
+  # to leave that much headroom above the weights. Verify against free VRAM
+  # on device; lower here first if it OOMs.
+  maxModelLen: 262144
+  toolCallParser: qwen3_coder
 
 # Tensor placement across the two 16GB GPUs + 125GiB host RAM.
-offload:
-  # Keep all MoE routed-expert tensors on CPU/RAM; everything else (attention,
-  # embeddings, shared layers) goes to the GPUs via -ngl 999.
-  tensorOverride: ".ffn_.*_exps.=CPU"
-  # Split evenly across the two GPUs (no NVLink between them).
-  tensorSplit: "1,1"
+vllm:
+  # Split the model across both GPUs (no NVLink between them).
+  tensorParallelSize: 2
+  # The 80B AWQ INT4 checkpoint (~40GB) doesn't fit in 32GB combined VRAM;
+  # spill this many GB *per GPU* to system RAM via vLLM's CPU offload path.
+  # ~24GB total offloaded -- dense, PCIe-bound, slower than llama.cpp's
+  # expert-specific offload, but keeps the 80B's coding quality. Sized higher
+  # than the minimum needed for the weights alone, to leave enough free VRAM
+  # for the full 256K context's KV cache (~3GB/GPU) plus activations/CUDA
+  # graphs. Tune against free VRAM on device.
+  cpuOffloadGb: 12
+  # AWQ Marlin is the fast, supported 4-bit kernel on Ada (cc 8.9); FP8 W8A8
+  # is also supported here but its ~92GB footprint is far too large.
+  quantization: awq_marlin
+  gpuMemoryUtilization: 0.90
 
-# Persist the downloaded GGUF weights so the ~134GB download only happens once.
+# Persist the downloaded AWQ weights so the ~40GB download only happens once.
 persistence:
   hostPath: /opt/teknoir/local-llm/models
 
 resources:
   requests:
     cpu: "8"
-    memory: 90Gi
+    memory: 40Gi
   limits:
     cpu: "12"
-    memory: 116Gi
+    memory: 80Gi
   # No nvidia.com/gpu request/limit: this k3s device's nvidia runtime doesn't
   # register GPU as a schedulable device-plugin resource (confirmed on-device),
   # so setting it would leave the pod stuck Pending. GPU access is granted purely
   # via runtimeClassName: nvidia, matching the sibling openclaw-helm chart.
 
-# Open WebUI: a chat UI for testing/evaluating the model, talking to
-# llama-server's OpenAI-compatible API (see service.yaml). No GPU needed.
-# Exposed via NodePort per this platform's convention (ClusterIP stays
-# reserved for the model API itself).
+# Open WebUI: a chat UI for testing/evaluating the model, talking to vLLM's
+# OpenAI-compatible API (see service.yaml). No GPU needed. Exposed via
+# NodePort per this platform's convention (ClusterIP stays reserved for the
+# model API itself).
 openWebui:
   image:
     repository: ghcr.io/open-webui/open-webui

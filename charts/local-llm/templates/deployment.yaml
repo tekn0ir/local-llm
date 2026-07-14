@@ -20,45 +20,50 @@ spec:
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       containers:
-        - name: llama-server
+        - name: vllm
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Qwen3-235B-A22B-Instruct-2507 (235B total / 22B active MoE) served with
-          # llama.cpp's mature CPU/RAM MoE-expert offload:
-          #   * -hf auto-downloads and caches the Unsloth GGUF quant from Hugging Face.
-          #   * -ot keeps all routed-expert tensors on CPU/RAM (they don't fit in
-          #     32GB combined VRAM).
-          #   * -ngl 999 + --tensor-split split everything else evenly across both
-          #     16GB GPUs (no NVLink between them).
+          # Qwen3-Coder-Next (80B total / 3B active MoE), AWQ INT4, served with
+          # vLLM's native Qwen3-Next hybrid DeltaNet+MoE support. The image's
+          # ENTRYPOINT is already `vllm serve`, so args start with the model:
+          #   * vLLM auto-downloads and caches the AWQ checkpoint from Hugging Face.
+          #   * --tensor-parallel-size splits the model across both 16GB GPUs.
+          #   * --cpu-offload-gb spills the remainder that doesn't fit in 32GB
+          #     combined VRAM to system RAM (dense, PCIe-bound offload).
+          #   * --tool-call-parser qwen3_coder enables agentic tool calling.
           args:
-            - -hf
-            - "{{ .Values.model.huggingfaceRepo }}:{{ .Values.model.quant }}"
-            - -c
-            - "{{ .Values.model.contextSize }}"
-            - -ngl
-            - "999"
-            - -ot
-            - "{{ .Values.offload.tensorOverride }}"
-            - --tensor-split
-            - "{{ .Values.offload.tensorSplit }}"
-            - --alias
+            - "{{ .Values.model.huggingfaceRepo }}"
+            - --tensor-parallel-size
+            - "{{ .Values.vllm.tensorParallelSize }}"
+            - --cpu-offload-gb
+            - "{{ .Values.vllm.cpuOffloadGb }}"
+            - --quantization
+            - "{{ .Values.vllm.quantization }}"
+            - --max-model-len
+            - "{{ .Values.model.maxModelLen }}"
+            - --gpu-memory-utilization
+            - "{{ .Values.vllm.gpuMemoryUtilization }}"
+            - --enable-auto-tool-choice
+            - --tool-call-parser
+            - "{{ .Values.model.toolCallParser }}"
+            - --served-model-name
             - "{{ .Values.model.servedName }}"
             - --host
             - "0.0.0.0"
             - --port
             - "8080"
-            - --jinja
           ports:
             - name: http
               containerPort: 8080
               protocol: TCP
           env:
-            # Persist the HF-format download cache so the ~134GB GGUF is fetched only once.
-            - name: LLAMA_CACHE
+            # Persist the Hugging Face download cache so the ~40GB AWQ checkpoint
+            # is fetched only once.
+            - name: HF_HOME
               value: /models
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          # startupProbe absorbs the slow first start (~134GB download + load across
+          # startupProbe absorbs the slow first start (~40GB download + load across
           # CPU+GPU); readinessProbe/livenessProbe only take over once it succeeds,
           # so a post-startup hang is still caught and restarted instead of the pod
           # being marked ready-forever with no liveness check.
@@ -86,8 +91,16 @@ spec:
           volumeMounts:
             - name: models
               mountPath: /models
+            - name: shm
+              mountPath: /dev/shm
       volumes:
         - name: models
           hostPath:
             path: {{ .Values.persistence.hostPath }}
             type: DirectoryOrCreate
+        # NCCL (used by --tensor-parallel-size across both GPUs) needs a
+        # memory-backed /dev/shm larger than the container default.
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi

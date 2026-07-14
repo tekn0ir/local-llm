@@ -3,17 +3,18 @@
 This chart deploys a local LLM server to a K3s cluster using the HelmChart CRD and
 controller. Persistence uses hostPath under `/opt/teknoir/local-llm`.
 
-The model backend serves **Qwen3-235B-A22B-Instruct-2507** (235B total / 22B active
-MoE) via `llama-server` (llama.cpp), using Unsloth's `UD-Q4_K_XL` GGUF quant
-(~134GB). MoE routed-expert tensors are kept on CPU/RAM; everything else is split
-across both GPUs. This fits the target device's 32GB combined VRAM + 125GB RAM
-budget on mature, mainline-supported software, prioritizing reasoning quality over
-throughput. See [HARDWARE.md](HARDWARE.md) for the target device's specs and the
-full model/runtime decision trail (why DeepSeek-V4-Flash, colibrì+GLM-5.2, and vLLM
-were ruled out).
+The model backend serves **Qwen3-Coder-Next** (80B total / 3B active MoE), a
+coding/agentic specialist, via **vLLM**, using the `bullpoint/Qwen3-Coder-Next-AWQ-4bit`
+AWQ INT4 checkpoint (~40GB). The model is split across both GPUs with tensor
+parallelism, and the remainder that doesn't fit in 32GB combined VRAM is spilled to
+system RAM via vLLM's CPU offload. This is dense, PCIe-bound offload, so throughput
+is modest — the tradeoff accepted for the 80B's coding quality over a smaller model
+that fits entirely in VRAM. See [HARDWARE.md](HARDWARE.md) for the target device's
+specs and the full model/runtime decision trail (why DeepSeek-V4-Flash,
+colibrì+GLM-5.2, and the other open coders were ruled out).
 
 The chart also deploys [Open WebUI](https://github.com/open-webui/open-webui) as a
-chat interface for testing/evaluating the model, wired to llama-server's
+chat interface for testing/evaluating the model, wired to vLLM's
 OpenAI-compatible API. It's exposed via NodePort `30080` (the model API itself
 stays ClusterIP-only).
 

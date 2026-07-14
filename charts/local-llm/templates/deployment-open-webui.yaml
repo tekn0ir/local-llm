@@ -27,7 +27,7 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
-            # Talk to llama-server's OpenAI-compatible API instead of Open WebUI's
+            # Talk to vLLM's OpenAI-compatible API instead of Open WebUI's
             # default Ollama backend, which nothing in this chart runs.
             - name: ENABLE_OLLAMA_API
               value: "false"

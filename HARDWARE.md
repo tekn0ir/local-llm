@@ -30,15 +30,43 @@ this device.
 - **colibrì + GLM-5.2**: ruled out. Built for boxes *without* enough VRAM
   (disk-streamed experts, 0.05-2 tok/s); this device has two real GPUs that would
   sit idle under that approach.
-- **Chosen: Qwen3-235B-A22B-Instruct-2507** (235B total / 22B active MoE) via
-  llama.cpp, Unsloth `UD-Q4_K_XL` GGUF (~134GB on disk). MoE routed-expert
-  tensors are kept on CPU/RAM (`-ot ".ffn_.*_exps.=CPU"`), everything else split
-  across both GPUs (`--tensor-split 1,1`). This fits the real 32GB VRAM + 125GB RAM
-  combined budget on mature, mainline-supported software. Reasoning quality is
-  prioritized over throughput (expect low, single-digit tok/s from the heavy CPU
-  offload — that's the accepted tradeoff, not a bug). See
-  [`charts/local-llm/values.yaml`](charts/local-llm/values.yaml) and
-  [`.aiassistant/rules/helm-chart.md`](.aiassistant/rules/helm-chart.md).
+- **Prior choice: Qwen3-235B-A22B-Instruct-2507** (235B total / 22B active MoE)
+  via llama.cpp, Unsloth `UD-Q4_K_XL` GGUF (~134GB on disk), MoE routed-expert
+  tensors kept on CPU/RAM. Served general-purpose instruct use well on mature,
+  mainline-supported software, prioritizing reasoning quality over throughput.
+  Superseded below by a coding-specialist pick on vLLM.
+
+### Switch to Qwen3-Coder-Next on vLLM (2026-07)
+
+Re-picked the model for **coding** and switched serving frameworks to **vLLM**
+(user request, overriding the prior "llama.cpp, not vLLM" choice above):
+
+- **GLM-5.2, DeepSeek V4, Qwen3-Coder-480B**: ruled out. None fit the 32GB
+  VRAM + 125GB RAM budget at any usable quant.
+- **DeepSeek "Coder" line**: ruled out. V2-236B is older/slower and fills RAM;
+  Lite-16B is too weak; V3.2/V4 are too big.
+- **Qwen3-Coder-Next-30B** (fits entirely in 32GB VRAM): considered as the
+  fallback if the 80B's CPU-offload throughput proves unacceptable on device,
+  but not chosen — the user prioritized the 80B's coding quality.
+- **Chosen: Qwen3-Coder-Next** (80B total / 3B active MoE, Feb 2026), a
+  coding/agentic specialist (~70.6% SWE-bench Verified, #1 self-hostable coder
+  at release, 256K native context, Apache-2.0), served via **vLLM** using the
+  `bullpoint/Qwen3-Coder-Next-AWQ-4bit` checkpoint (AWQ INT4, ~40–46GB).
+  - vLLM was chosen over llama.cpp here because it natively supports the
+    Qwen3-Next hybrid DeltaNet+MoE architecture (since Sep 2025), multi-token
+    prediction, and a dedicated `qwen3_coder` tool-call parser for agentic use.
+  - Quant: **AWQ Marlin** is the fast, supported 4-bit kernel on this Ada
+    (cc 8.9) hardware. FP8 W8A8 is also supported on Ada but its ~92GB
+    footprint is far too large for this budget. GGUF is not vLLM's native path.
+  - **Critical hardware reality:** the 80B at 4-bit (~40GB) does not fit in
+    32GB combined VRAM, so vLLM spills part of the weights to system RAM via
+    `--cpu-offload-gb` (a per-GPU value). This is dense, PCIe-bound offload —
+    slower than llama.cpp's expert-specific offload, giving up much of vLLM's
+    throughput advantage — but the user accepted this tradeoff for the 80B's
+    coding quality over the 30B-that-fits-in-VRAM alternative. The 125GB RAM
+    easily covers the offloaded remainder. See
+    [`charts/local-llm/values.yaml`](charts/local-llm/values.yaml) and
+    [`.aiassistant/rules/helm-chart.md`](.aiassistant/rules/helm-chart.md).
 
 ## Re-verifying
 
