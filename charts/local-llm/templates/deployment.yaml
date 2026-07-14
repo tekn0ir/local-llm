@@ -78,6 +78,11 @@ spec:
             # multi-GPU startup is confirmed stable on device.
             - name: NCCL_DEBUG
               value: "INFO"
+            # Reduce CUDA allocator fragmentation during weight load + the
+            # Marlin MoE repack, which run the card right up to its limit here.
+            # vLLM's own OOM message recommends this.
+            - name: PYTORCH_CUDA_ALLOC_CONF
+              value: expandable_segments:True
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           # startupProbe absorbs the slow first start (~40GB download + load across

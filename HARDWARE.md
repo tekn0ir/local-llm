@@ -81,6 +81,18 @@ Re-picked the model for **coding** and switched serving frameworks to **vLLM**
     shared-memory/host staging) and `--disable-custom-all-reduce` (vLLM's
     custom all-reduce also needs P2P). This is the same "verify TP sees both
     GPUs" risk flagged during the switch, resolved.
+  - **CPU-offload sizing (measured).** Past the NCCL fix, the next failure was
+    a CUDA OOM during `process_weights_after_loading` (the Marlin MoE weight
+    repack, `gptq_marlin_moe_repack`), not during KV allocation. At
+    `--cpu-offload-gb 12` roughly 15.1GB of weights stayed resident per card,
+    filling the 15.57GB GPU and leaving no room for the repack (~256MB short).
+    The model materializes to ~27GB/GPU (~54GB total) here, so offload must be
+    sized generously: `--cpu-offload-gb 20` drops resident weights to ~7GB and
+    leaves ~8GB/GPU for the repack, the 256K KV cache (~3GB/GPU), and
+    activations; ~40GB total lands in host RAM. Also set
+    `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` to curb allocator
+    fragmentation, as the OOM message recommends. Dial offload back down for
+    throughput only once startup is clean.
 
 ## Re-verifying
 

@@ -36,14 +36,16 @@ model:
 vllm:
   # Split the model across both GPUs (no NVLink between them).
   tensorParallelSize: 2
-  # The 80B AWQ INT4 checkpoint (~40GB) doesn't fit in 32GB combined VRAM;
-  # spill this many GB *per GPU* to system RAM via vLLM's CPU offload path.
-  # ~24GB total offloaded -- dense, PCIe-bound, slower than llama.cpp's
-  # expert-specific offload, but keeps the 80B's coding quality. Sized higher
-  # than the minimum needed for the weights alone, to leave enough free VRAM
-  # for the full 256K context's KV cache (~3GB/GPU) plus activations/CUDA
-  # graphs. Tune against free VRAM on device.
-  cpuOffloadGb: 12
+  # The 80B AWQ INT4 checkpoint doesn't fit in 32GB combined VRAM; spill this
+  # many GB *per GPU* to system RAM via vLLM's CPU offload path. Dense,
+  # PCIe-bound, slower than llama.cpp's expert-specific offload, but keeps the
+  # 80B's coding quality. Measured on device: at 12GB/GPU offload ~15.1GB of
+  # weights stayed resident per card, filling the 15.57GB GPU and OOMing the
+  # Marlin MoE weight repack (process_weights_after_loading) by ~256MB. 20GB
+  # offload drops resident weights to ~7GB, leaving ~8GB/GPU for the repack,
+  # the 256K KV cache (~3GB/GPU), and activations. ~40GB total offloaded to
+  # RAM (well within 125GB). Lower for more speed once it starts cleanly.
+  cpuOffloadGb: 20
   # No explicit --quantization: the bullpoint checkpoint is packaged as
   # compressed-tensors (an llm-compressor AWQ recipe), not vLLM's native AWQ
   # format, and vLLM errors out if the flag doesn't match what's baked into
