@@ -70,6 +70,17 @@ Re-picked the model for **coding** and switched serving frameworks to **vLLM**
     easily covers the offloaded remainder. See
     [`charts/local-llm/values.yaml`](charts/local-llm/values.yaml) and
     [`.aiassistant/rules/helm-chart.md`](.aiassistant/rules/helm-chart.md).
+  - **NCCL multi-GPU init hang (no NVLink / no PCIe P2P).** With
+    `--tensor-parallel-size 2`, NCCL by default probes PCIe P2P and InfiniBand
+    to set up the two-GPU collective. This board has no NVLink and P2P between
+    the two cards isn't usable, so NCCL hangs at distributed init: both GPUs
+    sit at 100% util with almost no memory allocated, the pod never reaches
+    weight download, and `/health` never comes up (observed: 40+ min, no error
+    in the logs, last line `vLLM is using nccl==...`). Fix baked into the
+    deployment: `NCCL_P2P_DISABLE=1` + `NCCL_IB_DISABLE=1` (fall back to
+    shared-memory/host staging) and `--disable-custom-all-reduce` (vLLM's
+    custom all-reduce also needs P2P). This is the same "verify TP sees both
+    GPUs" risk flagged during the switch, resolved.
 
 ## Re-verifying
 

@@ -35,6 +35,10 @@ spec:
             - "{{ .Values.model.huggingfaceRepo }}"
             - --tensor-parallel-size
             - "{{ .Values.vllm.tensorParallelSize }}"
+            # These GPUs have no NVLink and PCIe P2P isn't usable on this board,
+            # so vLLM's custom all-reduce (which needs P2P) can't work; disable
+            # it and fall back to NCCL. See NCCL_* env below.
+            - --disable-custom-all-reduce
             - --cpu-offload-gb
             - "{{ .Values.vllm.cpuOffloadGb }}"
             - --max-model-len
@@ -59,6 +63,21 @@ spec:
             # is fetched only once.
             - name: HF_HOME
               value: /models
+            # The two GPUs have no NVLink and PCIe P2P isn't usable on this
+            # board. Without these, NCCL hangs at distributed init -- both GPUs
+            # spin at 100% util with no memory allocated and the pod never
+            # becomes ready (it never even reaches weight download). Forcing
+            # NCCL off P2P and off the absent InfiniBand transport lets it fall
+            # back to shared-memory/host staging, which works.
+            - name: NCCL_P2P_DISABLE
+              value: "1"
+            - name: NCCL_IB_DISABLE
+              value: "1"
+            # Temporary: log NCCL's transport/topology decisions so a future
+            # init hang is diagnosable from `kubectl logs`. Safe to drop once
+            # multi-GPU startup is confirmed stable on device.
+            - name: NCCL_DEBUG
+              value: "INFO"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           # startupProbe absorbs the slow first start (~40GB download + load across
