@@ -50,6 +50,8 @@ vllm:
   # activation buffer at startup that OOMs here; eager mode skips it for a small
   # decode-speed cost. Set false to re-enable graphs once VRAM headroom allows.
   enforceEager: true
+  # KV-cache quantization (optional; leave empty for default/auto).
+  kvCacheDtype: fp8
   # MTP (Multi-Token Prediction) speculative decoding configuration.
   speculative:
     method: qwen3_next_mtp

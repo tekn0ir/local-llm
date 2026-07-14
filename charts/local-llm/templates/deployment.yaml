@@ -47,6 +47,10 @@ spec:
             # eager mode skips it, trading a small decode-speed cost for a fit.
             - --enforce-eager
             {{- end }}
+            {{- if .Values.vllm.kvCacheDtype }}
+            - --kv-cache-dtype
+            - "{{ .Values.vllm.kvCacheDtype }}"
+            {{- end }}
             - --trust-remote-code
             - --enable-auto-tool-choice
             - --tool-call-parser
